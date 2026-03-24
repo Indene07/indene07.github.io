@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MAC 与 Line Number 转换器</title>
+    <style>
+        :root {
+            --primary-color: #4F46E5;
+            --bg-color: #F3F4F6;
+            --box-bg: #FFFFFF;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: #333;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+        }
+        .container {
+            background-color: var(--box-bg);
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            width: 100%;
+            max-width: 500px;
+        }
+        h2 {
+            margin-top: 0;
+            text-align: center;
+            color: #111827;
+        }
+        .input-group {
+            margin-bottom: 20px;
+        }
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 500;
+            color: #4B5563;
+        }
+        input {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #D1D5DB;
+            border-radius: 6px;
+            box-sizing: border-box;
+            font-size: 16px;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+        input:focus {
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.2);
+        }
+        button {
+            width: 100%;
+            background-color: var(--primary-color);
+            color: white;
+            border: none;
+            padding: 12px;
+            border-radius: 6px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        button:hover {
+            background-color: #4338CA;
+        }
+        .result-box {
+            margin-top: 20px;
+            padding: 15px;
+            background-color: #F9FAFB;
+            border: 1px solid #E5E7EB;
+            border-radius: 6px;
+            min-height: 50px;
+            word-break: break-all;
+            display: none;
+        }
+        .success {
+            color: #047857;
+            background-color: #D1FAE5;
+            border-color: #A7F3D0;
+            display: block;
+        }
+        .error {
+            color: #B91C1C;
+            background-color: #FEE2E2;
+            border-color: #FECACA;
+            display: block;
+        }
+        .helper-text {
+            font-size: 13px;
+            color: #6B7280;
+            margin-top: 5px;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2>MAC & Line Number 转换工具</h2>
+    
+    <div class="input-group">
+        <label for="inputValue">请输入 MAC 地址 或 Line Number</label>
+        <input type="text" id="inputValue" placeholder="例如: AA:BB:CC:DD:EE:FF 或 85_187_3435973836_0">
+        <div class="helper-text">程序会自动识别输入类型并进行转换</div>
+    </div>
+
+    <button onclick="processInput()">进行转换</button>
+
+    <div id="resultBox" class="result-box"></div>
+</div>
+
+<script>
+    function processInput() {
+        const input = document.getElementById('inputValue').value.trim();
+        const resultBox = document.getElementById('resultBox');
+        
+        // 清除之前的样式
+        resultBox.className = 'result-box';
+        resultBox.innerHTML = '';
+
+        if (!input) {
+            showResult('请输入内容', false);
+            return;
+        }
+
+        const macRegex = /^([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})$/;
+        const lineRegex = /^\d+_\d+_\d+_\d+$/;
+
+        if (macRegex.test(input)) {
+            convertMacToLine(input);
+        } else if (lineRegex.test(input)) {
+            convertLineToMac(input);
+        } else {
+            showResult('格式不正确！请输入合法的 MAC 地址或 Line Number', false);
+        }
+    }
+
+    function convertMacToLine(macStr) {
+        const bytes = macStr.split(/[:-]/).map(hex => parseInt(hex, 16));
+        
+        const line1 = bytes[0] >> 1;
+        const line2 = bytes[1];
+        
+        const line3 = ((bytes[2] << 24) | (bytes[3] << 16) | (bytes[4] << 8) | bytes[5]) >>> 0;
+        const line4 = 0;
+
+        showResult(`<b>转换结果 (Line Number):</b><br><br>Line1: ${line1}, Line2: ${line2}, Line3: ${line3}, Line4: ${line4}<br><br>组合格式: <b>${line1}_${line2}_${line3}_${line4}</b>`, true);
+    }
+
+    function convertLineToMac(lineStr) {
+        const lines = lineStr.split('_').map(num => parseInt(num, 10));
+        
+        const line1 = lines[0];
+        const line2 = lines[1];
+        const line3 = lines[2];
+
+        const mac0_base = (line1 << 1) & 0xFE;
+        const mac0_opt1 = mac0_base;
+        const mac0_opt2 = mac0_base | 0x01;
+
+        const mac1 = line2 & 0xFF;
+
+        const mac2 = (line3 >>> 24) & 0xFF;
+        const mac3 = (line3 >>> 16) & 0xFF;
+        const mac4 = (line3 >>> 8) & 0xFF;
+        const mac5 = line3 & 0xFF;
+
+        const toHex = (n) => n.toString(16).padStart(2, '0').toUpperCase();
+
+        const formatMac = (m0) => `${toHex(m0)}:${toHex(mac1)}:${toHex(mac2)}:${toHex(mac3)}:${toHex(mac4)}:${toHex(mac5)}`;
+
+        const guess1 = formatMac(mac0_opt1);
+        const guess2 = formatMac(mac0_opt2);
+
+        showResult(`<b>转换结果 (猜测的 MAC 地址):</b><br><br>因为Line Number转换时丢失了最低位，MAC可能是以下两种之一：<br><br><b>${guess1}</b><br>或者<br><b>${guess2}</b>`, true);
+    }
+
+    function showResult(message, isSuccess) {
+        const resultBox = document.getElementById('resultBox');
+        resultBox.innerHTML = message;
+        resultBox.classList.add(isSuccess ? 'success' : 'error');
+    }
+</script>
+
+</body>
+</html>
